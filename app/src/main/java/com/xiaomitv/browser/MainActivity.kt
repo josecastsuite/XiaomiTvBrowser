@@ -36,6 +36,8 @@ import android.widget.VideoView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.webkit.WebSettingsCompat
+import androidx.webkit.WebViewFeature
 
 data class Tab(var webView: WebView, var titleView: TextView, var closeView: TextView)
 
@@ -139,6 +141,16 @@ class MainActivity : AppCompatActivity() {
         showCursorAtCenter()
     }
 
+    override fun onPause() {
+        super.onPause()
+        currentWeb()?.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        currentWeb()?.onResume()
+    }
+
     private fun setupAddressBarSuggestions() {
         val prefs = getSharedPreferences("tv_browser_prefs", MODE_PRIVATE)
         suggestions.addAll(prefs.getStringSet("visited_urls", emptySet()) ?: emptySet())
@@ -220,9 +232,12 @@ class MainActivity : AppCompatActivity() {
             settings.domStorageEnabled = true
             settings.useWideViewPort = true
             settings.loadWithOverviewMode = true
-            settings.mediaPlaybackRequiresUserGesture = false
+            settings.mediaPlaybackRequiresUserGesture = true
             settings.userAgentString = DESKTOP_USER_AGENT
             setInitialScale(desktopScalePercent)
+            if (WebViewFeature.isFeatureSupported(WebViewFeature.REQUESTED_WITH_HEADER_ALLOW_LIST)) {
+                WebSettingsCompat.setRequestedWithHeaderOriginAllowList(settings, emptySet())
+            }
             setDownloadListener { downloadUrl, _, _, mimetype, _ ->
                 val looksLikeVideo = mimetype.startsWith("video/") ||
                     Regex("\\.(mp4|webm|mkv|mov|m3u8|avi)(\\?.*)?$", RegexOption.IGNORE_CASE).containsMatchIn(downloadUrl)
@@ -331,9 +346,13 @@ class MainActivity : AppCompatActivity() {
     }
     private fun switchTo(index: Int) {
         if (index !in tabs.indices) return
+        if (currentIndex in tabs.indices && currentIndex != index) {
+            tabs[currentIndex].webView.onPause()
+        }
         currentIndex = index
         webContainerFrame.removeAllViews()
         webContainerFrame.addView(tabs[index].webView)
+        tabs[index].webView.onResume()
         addressBar.setText(tabs[index].webView.url ?: "")
         tabs.forEachIndexed { i, t ->
             t.titleView.isActivated = (i == index)
