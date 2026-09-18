@@ -1,8 +1,13 @@
 package com.phlox.tvwebbrowser.activity.player
 
+import android.app.PictureInPictureParams
+import android.content.res.Configuration
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.util.Rational
 import android.view.KeyEvent
+import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
@@ -78,18 +83,52 @@ class VideoPlayerActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
-        player?.pause()
+        if (!isInPictureInPictureMode) {
+            player?.pause()
+        }
     }
 
     override fun onResume() {
         super.onResume()
-        player?.play()
+        if (!isInPictureInPictureMode) {
+            player?.play()
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
         player?.release()
         player = null
+    }
+
+    //Picture-in-Picture: pressing Home while a video is playing shrinks it into a small
+    //window instead of stopping playback, matching how e.g. YouTube behaves on Android TV.
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (player?.isPlaying == true) {
+            enterPipMode()
+        }
+    }
+
+    private fun enterPipMode() {
+        when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.O -> {
+                val params = PictureInPictureParams.Builder()
+                    .setAspectRatio(Rational(16, 9))
+                    .build()
+                enterPictureInPictureMode(params)
+            }
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.N -> {
+                @Suppress("DEPRECATION")
+                enterPictureInPictureMode()
+            }
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        playerView.useController = !isInPictureInPictureMode
+        findViewById<View>(R.id.btnClose).visibility = if (isInPictureInPictureMode) View.GONE else View.VISIBLE
     }
 
     companion object {

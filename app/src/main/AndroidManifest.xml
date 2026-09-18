@@ -123,8 +123,10 @@
             android:name=".activity.player.VideoPlayerActivity"
             android:exported="false"
             android:theme="@style/Theme.AppCompat.NoActionBar"
-            android:configChanges="orientation|screenSize|keyboard|keyboardHidden"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden"
             android:screenOrientation="sensorLandscape"
+            android:supportsPictureInPicture="true"
+            android:resizeableActivity="true"
             tools:ignore="DiscouragedApi" />
 
         <activity android:name=".activity.IncognitoModeMainActivity"
