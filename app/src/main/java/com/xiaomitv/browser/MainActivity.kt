@@ -453,7 +453,7 @@ class MainActivity : AppCompatActivity() {
         if (nx < boundLeft) { if (overContent) web.scrollBy((-step).toInt(), 0); nx = boundLeft }
         if (nx > boundRight) { if (overContent) web.scrollBy(step.toInt(), 0); nx = boundRight }
         if (ny > boundBottom) { web.scrollBy(0, step.toInt()); ny = boundBottom }
-        if (ny < boundTop) ny = boundTop
+        if (ny < boundTop) { web.scrollBy(0, (-step).toInt()); ny = boundTop }
         cursorX = nx
         cursorY = ny
         cursorView.x = cursorX
