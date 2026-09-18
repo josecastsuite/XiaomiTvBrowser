@@ -6,11 +6,15 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.Uri
 import android.net.http.SslError
+import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.webkit.CookieManager
 import android.webkit.PermissionRequest
@@ -34,14 +38,47 @@ import androidx.core.content.ContextCompat
 data class Tab(var webView: WebView, var titleView: TextView)
 
 class MainActivity : AppCompatActivity() {
+    companion object {
+        private const val DESKTOP_USER_AGENT =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+        private const val DESKTOP_VIEWPORT_WIDTH_DP = 1366
+    }
+
     private lateinit var tabsContainer: LinearLayout
     private lateinit var addressBar: AutoCompleteTextView
     private val tabs = mutableListOf<Tab>()
     private var currentIndex = -1
     private val webContainerFrame by lazy { findViewById<FrameLayout>(R.id.webContainer) }
+    private val rootContainer by lazy { findViewById<FrameLayout>(R.id.rootContainer) }
     private val cursorView by lazy { findViewById<ImageView>(R.id.cursorPointer) }
+    private val btnNewTab by lazy { findViewById<TextView>(R.id.btnNewTab) }
     private var cursorX = 0f
     private var cursorY = 0f
+
+    private val desktopScalePercent: Int by lazy {
+        val screenWidthDp = resources.displayMetrics.widthPixels / resources.displayMetrics.density
+        ((screenWidthDp / DESKTOP_VIEWPORT_WIDTH_DP) * 100).toInt().coerceIn(30, 150)
+    }
+
+    private val heldDirections = mutableSetOf<Int>()
+    private var moveTicks = 0
+    private val cursorHandler = Handler(Looper.getMainLooper())
+    private val cursorTick = object : Runnable {
+        override fun run() {
+            if (heldDirections.isEmpty() || currentWeb()?.hasFocus() != true) {
+                heldDirections.clear()
+                return
+            }
+            moveTicks++
+            val density = resources.displayMetrics.density
+            val speed = (6 + minOf(moveTicks / 4, 18)) * density
+            heldDirections.toList().forEach { applyCursorDelta(it, speed) }
+            cursorHandler.postDelayed(this, 16)
+        }
+    }
+
+    private var customView: View? = null
+    private var customViewCallback: WebChromeClient.CustomViewCallback? = null
 
     private val suggestions = linkedSetOf<String>()
     private lateinit var suggestionAdapter: ArrayAdapter<String>
@@ -82,7 +119,7 @@ class MainActivity : AppCompatActivity() {
         tabsContainer = findViewById(R.id.tabsContainer)
         addressBar = findViewById(R.id.addressBar)
         setupAddressBarSuggestions()
-        findViewById<TextView>(R.id.btnNewTab).setOnClickListener { newTab("https://www.google.com") }
+        btnNewTab.setOnClickListener { newTab("https://www.google.com") }
         findViewById<TextView>(R.id.btnBack).setOnClickListener { currentWeb()?.goBack() }
         findViewById<TextView>(R.id.btnForward).setOnClickListener { currentWeb()?.goForward() }
         findViewById<TextView>(R.id.btnRefresh).setOnClickListener { currentWeb()?.reload() }
@@ -133,6 +170,23 @@ class MainActivity : AppCompatActivity() {
             "<h2>Sayfa yüklenemedi</h2><p>$safeDesc</p></body></html>"
     }
 
+    @Suppress("DEPRECATION")
+    private fun enterImmersiveMode() {
+        window.decorView.systemUiVisibility = (
+            View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                or View.SYSTEM_UI_FLAG_FULLSCREEN
+                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            )
+    }
+
+    @Suppress("DEPRECATION")
+    private fun exitImmersiveMode() {
+        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+    }
+
     private fun autoClearCacheIfNeeded() {
         val prefs = getSharedPreferences("tv_browser_prefs", MODE_PRIVATE)
         val lastClear = prefs.getLong("last_cache_clear", 0L)
@@ -150,11 +204,17 @@ class MainActivity : AppCompatActivity() {
         val webView = WebView(this).apply {
             isFocusable = true
             isFocusableInTouchMode = true
-            setOnFocusChangeListener { _, hasFocus -> if (hasFocus) showCursorAtCenter() else cursorView.visibility = View.GONE }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) defaultFocusHighlightEnabled = false
+            setOnFocusChangeListener { _, hasFocus ->
+                if (hasFocus) showCursorAtCenter() else { stopAllCursorMove(); cursorView.visibility = View.GONE }
+            }
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
             settings.useWideViewPort = true
             settings.loadWithOverviewMode = true
+            settings.mediaPlaybackRequiresUserGesture = false
+            settings.userAgentString = DESKTOP_USER_AGENT
+            setInitialScale(desktopScalePercent)
             webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView?, u: String?) {
                     if (view == currentWeb()) { addressBar.setText(view?.url); updateTabTitle() }
@@ -205,6 +265,27 @@ class MainActivity : AppCompatActivity() {
                         false
                     }
                 }
+                override fun onShowCustomView(view: View?, callback: WebChromeClient.CustomViewCallback?) {
+                    if (customView != null || view == null) {
+                        callback?.onCustomViewHidden()
+                        return
+                    }
+                    customView = view
+                    customViewCallback = callback
+                    rootContainer.addView(
+                        view,
+                        FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                    )
+                    enterImmersiveMode()
+                }
+                override fun onHideCustomView() {
+                    val view = customView ?: return
+                    rootContainer.removeView(view)
+                    customView = null
+                    customViewCallback?.onCustomViewHidden()
+                    customViewCallback = null
+                    exitImmersiveMode()
+                }
             }
         }
         val tabView = TextView(this).apply {
@@ -215,6 +296,7 @@ class MainActivity : AppCompatActivity() {
             isFocusable = true
             isFocusableInTouchMode = true
             isClickable = true
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) defaultFocusHighlightEnabled = false
             setOnClickListener { switchTo(tabs.indexOfFirst { it.titleView == this }) }
             setOnLongClickListener { closeTab(tabs.indexOfFirst { it.titleView == this }); true }
             setOnFocusChangeListener { v, hasFocus ->
@@ -228,7 +310,7 @@ class MainActivity : AppCompatActivity() {
         }
         val tab = Tab(webView, tabView)
         tabs.add(tab)
-        tabsContainer.addView(tabView)
+        tabsContainer.addView(tabView, tabsContainer.indexOfChild(btnNewTab))
         switchTo(tabs.size - 1)
         webView.loadUrl(url)
     }
@@ -263,19 +345,26 @@ class MainActivity : AppCompatActivity() {
         currentWeb()?.loadUrl(url)
     }
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_BACK && customView != null) {
+            customViewCallback?.onCustomViewHidden()
+            return true
+        }
         if (keyCode == KeyEvent.KEYCODE_BACK && currentWeb()?.canGoBack() == true) { currentWeb()?.goBack(); return true }
         return super.onKeyDown(keyCode, event)
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (event.action == KeyEvent.ACTION_DOWN && currentWeb()?.hasFocus() == true) {
+        if (currentWeb()?.hasFocus() == true) {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    moveCursor(event.keyCode, event.repeatCount)
+                    when (event.action) {
+                        KeyEvent.ACTION_DOWN -> startCursorMove(event.keyCode)
+                        KeyEvent.ACTION_UP -> stopCursorMove(event.keyCode)
+                    }
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                    performCursorClick()
+                    if (event.action == KeyEvent.ACTION_DOWN) performCursorClick()
                     return true
                 }
             }
@@ -293,11 +382,33 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun moveCursor(keyCode: Int, repeatCount: Int) {
+    private fun startCursorMove(keyCode: Int) {
+        val isNew = heldDirections.add(keyCode)
+        if (isNew && heldDirections.size == 1) {
+            moveTicks = 0
+            applyCursorDelta(keyCode, 14 * resources.displayMetrics.density)
+            cursorHandler.removeCallbacks(cursorTick)
+            cursorHandler.postDelayed(cursorTick, 120)
+        }
+    }
+
+    private fun stopCursorMove(keyCode: Int) {
+        heldDirections.remove(keyCode)
+        if (heldDirections.isEmpty()) {
+            cursorHandler.removeCallbacks(cursorTick)
+            moveTicks = 0
+        }
+    }
+
+    private fun stopAllCursorMove() {
+        heldDirections.clear()
+        cursorHandler.removeCallbacks(cursorTick)
+        moveTicks = 0
+    }
+
+    private fun applyCursorDelta(keyCode: Int, step: Float) {
         val web = currentWeb() ?: return
         if (cursorView.width == 0 || webContainerFrame.height == 0) return
-        val density = resources.displayMetrics.density
-        val step = (18 + minOf(repeatCount * 6, 60)) * density
         val boundTop = webContainerFrame.top.toFloat()
         val boundLeft = 0f
         val boundRight = boundLeft + webContainerFrame.width - cursorView.width
@@ -311,10 +422,11 @@ class MainActivity : AppCompatActivity() {
             KeyEvent.KEYCODE_DPAD_DOWN -> ny += step
         }
         if (keyCode == KeyEvent.KEYCODE_DPAD_UP && ny < boundTop) {
+            stopAllCursorMove()
             findViewById<TextView>(R.id.btnBack).requestFocus()
             return
         }
-        if (nx < boundLeft) { web.scrollBy(-step.toInt(), 0); nx = boundLeft }
+        if (nx < boundLeft) { web.scrollBy((-step).toInt(), 0); nx = boundLeft }
         if (nx > boundRight) { web.scrollBy(step.toInt(), 0); nx = boundRight }
         if (ny > boundBottom) { web.scrollBy(0, step.toInt()); ny = boundBottom }
         if (ny < boundTop) ny = boundTop
