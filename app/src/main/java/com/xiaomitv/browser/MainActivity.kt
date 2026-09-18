@@ -11,6 +11,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
@@ -32,11 +33,12 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.VideoView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 
-data class Tab(var webView: WebView, var titleView: TextView)
+data class Tab(var webView: WebView, var titleView: TextView, var closeView: TextView)
 
 class MainActivity : AppCompatActivity() {
     companion object {
@@ -82,6 +84,10 @@ class MainActivity : AppCompatActivity() {
 
     private var customView: View? = null
     private var customViewCallback: WebChromeClient.CustomViewCallback? = null
+
+    private var activeVideoContainer: FrameLayout? = null
+    private var activeVideoView: VideoView? = null
+    private var videoCloseButton: TextView? = null
 
     private val suggestions = linkedSetOf<String>()
     private lateinit var suggestionAdapter: ArrayAdapter<String>
@@ -216,6 +222,15 @@ class MainActivity : AppCompatActivity() {
             settings.mediaPlaybackRequiresUserGesture = false
             settings.userAgentString = DESKTOP_USER_AGENT
             setInitialScale(desktopScalePercent)
+            setDownloadListener { downloadUrl, _, _, mimetype, _ ->
+                val looksLikeVideo = mimetype.startsWith("video/") ||
+                    Regex("\\.(mp4|webm|mkv|mov|m3u8|avi)(\\?.*)?$", RegexOption.IGNORE_CASE).containsMatchIn(downloadUrl)
+                if (looksLikeVideo) {
+                    promptAndPlayVideo(downloadUrl)
+                } else {
+                    try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl))) } catch (e: Exception) {}
+                }
+            }
             webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView?, u: String?) {
                     if (view == currentWeb()) { addressBar.setText(view?.url); updateTabTitle() }
@@ -277,6 +292,7 @@ class MainActivity : AppCompatActivity() {
                         view,
                         FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
                     )
+                    cursorView.bringToFront()
                     enterImmersiveMode()
                 }
                 override fun onHideCustomView() {
@@ -289,18 +305,26 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        val tabView = TextView(this).apply {
+        val titleView = TextView(this).apply {
             text = " Yeni Sekme "
-            setPadding(32, 12, 32, 12)
+            setPadding(32, 12, 8, 12)
             textSize = 13f
-            setBackgroundColor(Color.WHITE)
+            setBackgroundResource(R.drawable.tv_tab_bg)
             isClickable = true
-            setOnClickListener { switchTo(tabs.indexOfFirst { it.titleView == this }) }
-            setOnLongClickListener { closeTab(tabs.indexOfFirst { it.titleView == this }); true }
+            setOnClickListener { switchTo(tabs.indexOfFirst { it.titleView === this }) }
         }
-        val tab = Tab(webView, tabView)
+        val closeView = TextView(this).apply {
+            text = "✕"
+            setPadding(8, 12, 24, 12)
+            textSize = 13f
+            setBackgroundResource(R.drawable.tv_tab_bg)
+            isClickable = true
+            setOnClickListener { closeTab(tabs.indexOfFirst { it.closeView === this }) }
+        }
+        val tab = Tab(webView, titleView, closeView)
         tabs.add(tab)
-        tabsContainer.addView(tabView, tabsContainer.indexOfChild(btnNewTab))
+        tabsContainer.addView(titleView, tabsContainer.indexOfChild(btnNewTab))
+        tabsContainer.addView(closeView, tabsContainer.indexOfChild(btnNewTab))
         switchTo(tabs.size - 1)
         webView.loadUrl(url)
     }
@@ -310,15 +334,19 @@ class MainActivity : AppCompatActivity() {
         webContainerFrame.removeAllViews()
         webContainerFrame.addView(tabs[index].webView)
         addressBar.setText(tabs[index].webView.url ?: "")
-        refreshTabColors()
+        tabs.forEachIndexed { i, t ->
+            t.titleView.isActivated = (i == index)
+            t.closeView.isActivated = (i == index)
+        }
         updateTabTitle()
         tabs[index].webView.requestFocus()
     }
     private fun closeTab(index: Int) {
         if (index !in tabs.indices) return
         val tab = tabs[index]
-        if (hoveredView === tab.titleView) hoveredView = null
+        if (hoveredView === tab.titleView || hoveredView === tab.closeView) hoveredView = null
         tabsContainer.removeView(tab.titleView)
+        tabsContainer.removeView(tab.closeView)
         tab.webView.destroy()
         tabs.removeAt(index)
         if (tabs.isEmpty()) newTab("https://www.google.com") else switchTo((index - 1).coerceAtLeast(0))
@@ -326,7 +354,7 @@ class MainActivity : AppCompatActivity() {
     private fun updateTabTitle() {
         val web = currentWeb() ?: return
         val title = web.title?.take(12) ?: "Google"
-        tabs[currentIndex].titleView.text = " $title X"
+        tabs[currentIndex].titleView.text = " $title "
     }
     private fun loadUrlFromBar() {
         var url = addressBar.text.toString().trim()
@@ -336,6 +364,10 @@ class MainActivity : AppCompatActivity() {
         currentWeb()?.loadUrl(url)
     }
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_BACK && activeVideoContainer != null) {
+            closeNativeVideoPlayer()
+            return true
+        }
         if (keyCode == KeyEvent.KEYCODE_BACK && customView != null) {
             customViewCallback?.onCustomViewHidden()
             return true
@@ -444,8 +476,12 @@ class MainActivity : AppCompatActivity() {
         return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom
     }
 
-    private fun hoverCandidates(): List<View> =
-        listOf(btnBackView, btnForwardView, btnRefreshView, btnNewTab, addressBar) + tabs.map { it.titleView }
+    private fun hoverCandidates(): List<View> {
+        val base = mutableListOf<View>(btnBackView, btnForwardView, btnRefreshView, btnNewTab, addressBar)
+        tabs.forEach { base.add(it.titleView); base.add(it.closeView) }
+        videoCloseButton?.let { base.add(it) }
+        return base
+    }
 
     private fun updateHoverState() {
         val hotX = cursorX + cursorView.width / 2f
@@ -455,19 +491,6 @@ class MainActivity : AppCompatActivity() {
         hoveredView?.isSelected = false
         hoveredView = newHover
         hoveredView?.isSelected = true
-        refreshTabColors()
-    }
-
-    private fun refreshTabColors() {
-        tabs.forEachIndexed { i, t ->
-            t.titleView.setBackgroundColor(
-                when {
-                    t.titleView === hoveredView -> Color.parseColor("#4285F4")
-                    i == currentIndex -> Color.WHITE
-                    else -> Color.parseColor("#C9D0DA")
-                }
-            )
-        }
     }
 
     private fun performCursorClick() {
@@ -492,5 +515,65 @@ class MainActivity : AppCompatActivity() {
         web.dispatchTouchEvent(up)
         down.recycle()
         up.recycle()
+    }
+
+    private fun promptAndPlayVideo(url: String) {
+        runOnUiThread {
+            AlertDialog.Builder(this)
+                .setTitle("Video algılandı")
+                .setMessage("Bu bağlantı bir video dosyası. Medya oynatıcıyla hızlıca açılsın mı?")
+                .setPositiveButton("Aç") { _, _ -> openNativeVideoPlayer(url) }
+                .setNegativeButton("Vazgeç", null)
+                .show()
+        }
+    }
+
+    private fun openNativeVideoPlayer(url: String) {
+        closeNativeVideoPlayer()
+        val density = resources.displayMetrics.density
+        val container = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
+        val videoView = VideoView(this).apply {
+            setVideoURI(Uri.parse(url))
+            setOnPreparedListener { it.start() }
+            setOnCompletionListener { closeNativeVideoPlayer() }
+            setOnErrorListener { _, _, _ ->
+                runOnUiThread {
+                    closeNativeVideoPlayer()
+                    try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } catch (e: Exception) {}
+                }
+                true
+            }
+        }
+        container.addView(videoView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        val closeBtn = TextView(this).apply {
+            text = "✕"
+            textSize = 18f
+            setTextColor(Color.WHITE)
+            setPadding((16 * density).toInt(), (16 * density).toInt(), (16 * density).toInt(), (16 * density).toInt())
+            setBackgroundColor(Color.parseColor("#66000000"))
+            isClickable = true
+            setOnClickListener { closeNativeVideoPlayer() }
+        }
+        container.addView(
+            closeBtn,
+            FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.END)
+        )
+        rootContainer.addView(container, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        cursorView.bringToFront()
+        activeVideoContainer = container
+        activeVideoView = videoView
+        videoCloseButton = closeBtn
+        enterImmersiveMode()
+    }
+
+    private fun closeNativeVideoPlayer() {
+        val container = activeVideoContainer ?: return
+        activeVideoView?.stopPlayback()
+        rootContainer.removeView(container)
+        if (hoveredView === videoCloseButton) hoveredView = null
+        activeVideoContainer = null
+        activeVideoView = null
+        videoCloseButton = null
+        exitImmersiveMode()
     }
 }
