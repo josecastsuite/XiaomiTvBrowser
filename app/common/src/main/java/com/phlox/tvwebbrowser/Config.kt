@@ -283,7 +283,7 @@ class Config(val prefs: SharedPreferences) {
 
     //locked to its constructor default (used only for userAgentString, pinned to DESKTOP_CHROME_UA) -
     //not user-configurable by design, ignores any stored/incoming value
-    inner class ObservableOptStringPreference(default: String?, private val prefsKey: String) : ObservableValue<String?>(default) {
+    inner class ObservableOptStringPreference(private val default: String?, private val prefsKey: String) : ObservableValue<String?>(default) {
         override var value: String? = default
             set(value) {
                 field = default
