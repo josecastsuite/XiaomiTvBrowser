@@ -1,12 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="#C9D0DA">
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent">
+<LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:background="#C9D0DA">
 <LinearLayout android:id="@+id/tabsContainer" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:background="#C9D0DA" android:padding="4dp"/>
 <LinearLayout android:layout_width="match_parent" android:layout_height="48dp" android:orientation="horizontal" android:background="#FFFFFF" android:gravity="center_vertical">
-<TextView android:id="@+id/btnBack" android:layout_width="40dp" android:layout_height="match_parent" android:text="←" android:gravity="center" android:textSize="18sp"/>
-<TextView android:id="@+id/btnForward" android:layout_width="40dp" android:layout_height="match_parent" android:text="→" android:gravity="center" android:textSize="18sp"/>
-<TextView android:id="@+id/btnRefresh" android:layout_width="40dp" android:layout_height="match_parent" android:text="↻" android:gravity="center" android:textSize="18sp"/>
-<EditText android:id="@+id/addressBar" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:background="#F1F3F4" android:padding="8dp" android:singleLine="true" android:imeOptions="actionGo" android:hint="google.com"/>
-<TextView android:id="@+id/btnNewTab" android:layout_width="40dp" android:layout_height="match_parent" android:text="+" android:gravity="center" android:textSize="20sp"/>
+<TextView android:id="@+id/btnBack" android:layout_width="40dp" android:layout_height="match_parent" android:text="←" android:gravity="center" android:textSize="18sp" android:focusable="true" android:focusableInTouchMode="true" android:background="@drawable/tv_focus_bg" android:textColor="@color/tv_button_text"/>
+<TextView android:id="@+id/btnForward" android:layout_width="40dp" android:layout_height="match_parent" android:text="→" android:gravity="center" android:textSize="18sp" android:focusable="true" android:focusableInTouchMode="true" android:background="@drawable/tv_focus_bg" android:textColor="@color/tv_button_text"/>
+<TextView android:id="@+id/btnRefresh" android:layout_width="40dp" android:layout_height="match_parent" android:text="↻" android:gravity="center" android:textSize="18sp" android:focusable="true" android:focusableInTouchMode="true" android:background="@drawable/tv_focus_bg" android:textColor="@color/tv_button_text"/>
+<AutoCompleteTextView android:id="@+id/addressBar" android:layout_width="0dp" android:layout_height="36dp" android:layout_weight="1" android:background="@drawable/tv_address_bg" android:padding="8dp" android:singleLine="true" android:imeOptions="actionGo" android:hint="google.com" android:completionThreshold="1" android:dropDownWidth="match_parent"/>
+<TextView android:id="@+id/btnNewTab" android:layout_width="40dp" android:layout_height="match_parent" android:text="+" android:gravity="center" android:textSize="20sp" android:focusable="true" android:focusableInTouchMode="true" android:background="@drawable/tv_focus_bg" android:textColor="@color/tv_button_text"/>
 </LinearLayout>
 <FrameLayout android:id="@+id/webContainer" android:layout_width="match_parent" android:layout_height="match_parent" android:background="#FFFFFF"/>
 </LinearLayout>
+<ImageView android:id="@+id/cursorPointer" android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/cursor_pointer" android:visibility="gone" android:elevation="8dp" android:contentDescription="@null"/>
+</FrameLayout>
