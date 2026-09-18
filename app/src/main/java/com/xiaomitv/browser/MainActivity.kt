@@ -4,7 +4,6 @@ import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
-import android.graphics.Rect
 import android.net.Uri
 import android.net.http.SslError
 import android.os.Bundle
@@ -78,6 +77,7 @@ class MainActivity : AppCompatActivity() {
             val density = resources.displayMetrics.density
             val speed = (6 + minOf(moveTicks / 4, 18)) * density * CURSOR_SPEED_MULTIPLIER
             heldDirections.toList().forEach { applyCursorDelta(it, speed) }
+            if (moveTicks % 2 == 0) updateHoverState()
             cursorHandler.postDelayed(this, 16)
         }
     }
@@ -415,6 +415,7 @@ class MainActivity : AppCompatActivity() {
         if (isNew && heldDirections.size == 1) {
             moveTicks = 0
             applyCursorDelta(keyCode, 14 * CURSOR_SPEED_MULTIPLIER * resources.displayMetrics.density)
+            updateHoverState()
             cursorHandler.removeCallbacks(cursorTick)
             cursorHandler.postDelayed(cursorTick, 120)
         }
@@ -458,22 +459,6 @@ class MainActivity : AppCompatActivity() {
         cursorY = ny
         cursorView.x = cursorX
         cursorView.y = cursorY
-        updateHoverState()
-    }
-
-    private fun rectRelativeToRoot(view: View): Rect {
-        val viewLoc = IntArray(2)
-        view.getLocationOnScreen(viewLoc)
-        val rootLoc = IntArray(2)
-        rootContainer.getLocationOnScreen(rootLoc)
-        val left = viewLoc[0] - rootLoc[0]
-        val top = viewLoc[1] - rootLoc[1]
-        return Rect(left, top, left + view.width, top + view.height)
-    }
-
-    private fun pointInView(x: Float, y: Float, view: View): Boolean {
-        val r = rectRelativeToRoot(view)
-        return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom
     }
 
     private fun hoverCandidates(): List<View> {
@@ -486,11 +471,29 @@ class MainActivity : AppCompatActivity() {
     private fun updateHoverState() {
         val hotX = cursorX + cursorView.width / 2f
         val hotY = cursorY + cursorView.height / 2f
-        val newHover = hoverCandidates().firstOrNull { pointInView(hotX, hotY, it) }
+        val rootLoc = IntArray(2)
+        rootContainer.getLocationOnScreen(rootLoc)
+        val viewLoc = IntArray(2)
+        val newHover = hoverCandidates().firstOrNull { view ->
+            view.getLocationOnScreen(viewLoc)
+            val left = viewLoc[0] - rootLoc[0]
+            val top = viewLoc[1] - rootLoc[1]
+            hotX >= left && hotX <= left + view.width && hotY >= top && hotY <= top + view.height
+        }
         if (newHover === hoveredView) return
+        animateCloseHover(hoveredView, false)
         hoveredView?.isSelected = false
         hoveredView = newHover
         hoveredView?.isSelected = true
+        animateCloseHover(newHover, true)
+    }
+
+    private fun animateCloseHover(view: View?, hovering: Boolean) {
+        if (view == null) return
+        val isTabClose = tabs.any { it.closeView === view } || view === videoCloseButton
+        if (!isTabClose) return
+        val scale = if (hovering) 1.3f else 1f
+        view.animate().scaleX(scale).scaleY(scale).setDuration(120).start()
     }
 
     private fun performCursorClick() {
