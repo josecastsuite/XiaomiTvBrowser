@@ -143,16 +143,8 @@ class Config(val prefs: SharedPreferences) {
     }
 
     var homePageMode: HomePageMode
-        get() = prefs.getInt(HOME_PAGE_MODE, HomePageMode.CUSTOM.ordinal)
-            .let {
-                //ignore value if search engine as home page is set
-                if (prefs.getBoolean(SEARCH_ENGINE_AS_HOME_PAGE_KEY, false)) {
-                    prefs.edit().remove(SEARCH_ENGINE_AS_HOME_PAGE_KEY).apply()
-                    HomePageMode.SEARCH_ENGINE.ordinal
-                } else it
-            }
-            .let { if (it < 0 || it >= HomePageMode.values().size) 0 else it }
-            .let { HomePageMode.values()[it] }
+        //locked to CUSTOM (real google.com, see homePage below) - not user-configurable by design
+        get() = HomePageMode.CUSTOM
         set(value) {
             prefs.edit().putInt(HOME_PAGE_MODE, value.ordinal).apply()
         }
@@ -166,7 +158,8 @@ class Config(val prefs: SharedPreferences) {
         }
 
     var homePage: String
-        get() = prefs.getString(HOME_PAGE_KEY, "https://www.google.com")!!
+        //locked to real google.com - not user-configurable by design
+        get() = "https://www.google.com"
         set(value) {
             prefs.edit().putString(HOME_PAGE_KEY, value).apply()
         }
@@ -288,12 +281,12 @@ class Config(val prefs: SharedPreferences) {
             }
     }
 
+    //locked to its constructor default (used only for userAgentString, pinned to DESKTOP_CHROME_UA) -
+    //not user-configurable by design, ignores any stored/incoming value
     inner class ObservableOptStringPreference(default: String?, private val prefsKey: String) : ObservableValue<String?>(default) {
-        override var value: String? = prefs.getString(prefsKey, default)
+        override var value: String? = default
             set(value) {
-                if (value == null) prefs.edit().remove(prefsKey).apply()
-                else prefs.edit().putString(prefsKey, value).apply()
-                field = value
+                field = default
                 notifyObservers()
             }
     }
