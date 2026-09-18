@@ -17,6 +17,8 @@ class Config(val prefs: SharedPreferences) {
         const val AUTO_CHECK_UPDATES_KEY = "auto_check_updates"
         const val UPDATE_CHANNEL_KEY = "update_channel"
         const val TV_BRO_UA_PREFIX = "TV Bro/1.0 "
+        const val DESKTOP_CHROME_UA =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36"
         const val HOME_URL_ALIAS = "about:home"
         const val KEEP_SCREEN_ON_KEY = "keep_screen_on"
         /** When true, analog stick / hat axes from generic motion events are not translated to DPAD keys. */
@@ -141,7 +143,7 @@ class Config(val prefs: SharedPreferences) {
     }
 
     var homePageMode: HomePageMode
-        get() = prefs.getInt(HOME_PAGE_MODE, 0)
+        get() = prefs.getInt(HOME_PAGE_MODE, HomePageMode.CUSTOM.ordinal)
             .let {
                 //ignore value if search engine as home page is set
                 if (prefs.getBoolean(SEARCH_ENGINE_AS_HOME_PAGE_KEY, false)) {
@@ -164,7 +166,7 @@ class Config(val prefs: SharedPreferences) {
         }
 
     var homePage: String
-        get() = prefs.getString(HOME_PAGE_KEY, HOME_URL_ALIAS)!!
+        get() = prefs.getString(HOME_PAGE_KEY, "https://www.google.com")!!
         set(value) {
             prefs.edit().putString(HOME_PAGE_KEY, value).apply()
         }
@@ -215,7 +217,7 @@ class Config(val prefs: SharedPreferences) {
             prefs.edit().putBoolean(INITIAL_BOOKMARKS_SUGGESTIONS_LOADED, value).apply()
         }
 
-    var userAgentString = ObservableOptStringPreference(null, USER_AGENT_PREF_KEY)
+    var userAgentString = ObservableOptStringPreference(DESKTOP_CHROME_UA, USER_AGENT_PREF_KEY)
 
     var adBlockEnabled: Boolean = prefs.getBoolean(ADBLOCK_ENABLED_PREF_KEY, true)
         set(value) {
