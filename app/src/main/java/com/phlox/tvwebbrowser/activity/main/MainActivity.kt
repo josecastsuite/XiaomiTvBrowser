@@ -847,6 +847,16 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
                 val keyCode = if (event.keyCode != 0) event.keyCode else event.scanCode
                 val keyCodeBackNavigation = keyCode == KeyEvent.KEYCODE_ESCAPE ||
                         keyCode == KeyEvent.KEYCODE_BUTTON_B || keyCode == KeyEvent.KEYCODE_BACK
+
+                if (isFullscreen && event.action == KeyEvent.ACTION_DOWN &&
+                    (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT)) {
+                    val webEngine = tabsModel.currentTab.value?.webEngine
+                    if (webEngine != null) {
+                        if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT) webEngine.rewind() else webEngine.fastForward()
+                        return true
+                    }
+                }
+
                 val shortcutMgr = ShortcutMgr.getInstance()
                 val currentTab = tabsModel.currentTab.value
                 if (!keyCodeBackNavigation &&

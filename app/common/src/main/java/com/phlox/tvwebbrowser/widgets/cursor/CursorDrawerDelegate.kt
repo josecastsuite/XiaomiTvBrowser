@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.Point
 import android.graphics.PointF
 import android.graphics.Rect
@@ -335,23 +336,35 @@ class CursorDrawerDelegate(val context: Context, val surface: View) {
             val cy = cursorPosition.y
             val radius = if (dpadCenterPressed) cursorRadiusPressed else
                     (cursorRadius * cursorRadiusAnimationMultiplier)
+            //standard OS-style arrow pointer, hotspot (click point) at the tip (cx, cy)
+            val size = radius.toFloat() * 1.9f
+            val arrow = Path().apply {
+                moveTo(cx, cy)
+                lineTo(cx, cy + size * 0.75f)
+                lineTo(cx + size * 0.22f, cy + size * 0.58f)
+                lineTo(cx + size * 0.35f, cy + size * 0.92f)
+                lineTo(cx + size * 0.5f, cy + size * 0.86f)
+                lineTo(cx + size * 0.37f, cy + size * 0.52f)
+                lineTo(cx + size * 0.64f, cy + size * 0.52f)
+                close()
+            }
 
             paint.color = when {
-                grabMode -> Color.argb(128, 200, 200, 255)
-                else -> Color . argb (128, 255, 255, 255)
+                grabMode -> Color.argb(235, 210, 210, 255)
+                else -> Color.argb(235, 255, 255, 255)
             }
             paint.style = Paint.Style.FILL
-            canvas.drawCircle(cx, cy, radius.toFloat(), paint)
+            canvas.drawPath(arrow, paint)
 
-            paint.color = Color.GRAY
+            paint.color = Color.DKGRAY
             paint.strokeWidth = cursorStrokeWidth
             paint.style = Paint.Style.STROKE
-            canvas.drawCircle(cx, cy, radius.toFloat(), paint)
+            canvas.drawPath(arrow, paint)
 
             if (grabMode) {
-                val halfRadius = radius.toFloat() / 2
-                canvas.drawLine(cx - halfRadius, cy, cx + halfRadius, cy, paint)
-                canvas.drawLine(cx, cy - halfRadius, cx, cy + halfRadius, paint)
+                paint.style = Paint.Style.FILL
+                paint.color = Color.argb(220, 70, 70, 235)
+                canvas.drawCircle(cx + size * 0.18f, cy + size * 0.18f, size * 0.09f, paint)
             }
         }
     }

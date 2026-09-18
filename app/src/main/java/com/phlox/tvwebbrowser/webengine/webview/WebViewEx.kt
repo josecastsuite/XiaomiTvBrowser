@@ -66,6 +66,9 @@ open class WebViewEx(context: Context, val callback: Callback, val jsInterface: 
         const val INTERNAL_SCHEME_WARNING_DOMAIN = "warning"
         const val INTERNAL_SCHEME_WARNING_DOMAIN_TYPE_CERT = "certificate"
         val WIDEVINE_UUID = UUID(-0x121074568629b532L,-0x5c37d8232ae2de13L)
+        //reference desktop viewport width (dp) used to compute the initial zoom so pages
+        //fill the screen at the same proportions a real PC monitor would show them at
+        const val DESKTOP_REFERENCE_WIDTH_DP = 1366f
     }
 
     private var virtualCursorMode: Boolean = true
@@ -162,6 +165,14 @@ open class WebViewEx(context: Context, val callback: Callback, val jsInterface: 
                 }
             }
         }
+
+        //Match real desktop-monitor proportions: compute the zoom % that makes a
+        //DESKTOP_REFERENCE_WIDTH_DP-wide desktop page exactly fill this screen's width,
+        //instead of relying on WebView's own auto-fit heuristic.
+        val screenWidthDp = resources.displayMetrics.widthPixels / resources.displayMetrics.density
+        val desktopScalePercent = ((screenWidthDp / DESKTOP_REFERENCE_WIDTH_DP) * 100)
+            .toInt().coerceIn(30, 200)
+        setInitialScale(desktopScalePercent)
 
         setOnLongClickListener { v ->
             true

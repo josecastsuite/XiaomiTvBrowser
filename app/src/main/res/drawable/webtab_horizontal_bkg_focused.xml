@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <solid android:color="@color/top_bar_background" />
+    <solid android:color="@color/top_bar_background2" />
+    <stroke android:width="2dp" android:color="@color/web_tab_selected_text_color" />
     <corners
         android:topLeftRadius="10dp"
         android:topRightRadius="10dp"
