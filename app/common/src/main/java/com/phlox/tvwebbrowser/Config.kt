@@ -274,7 +274,7 @@ class Config(val prefs: SharedPreferences) {
 
     //locked to its constructor default (search engine always Google, adblock list always the
     //built-in default) - not user-configurable by design, ignores any stored/incoming value
-    inner class ObservableStringPreference(default: String, private val prefsKey: String) : ObservableValue<String>(default) {
+    inner class ObservableStringPreference(private val default: String, private val prefsKey: String) : ObservableValue<String>(default) {
         override var value: String = default
             set(value) {
                 field = default
