@@ -27,7 +27,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:id="@+id/rlActionBar"
-        android:background="@color/top_bar_background"
+        android:background="@color/top_bar_background2"
         android:elevation="5dp"
         android:clipChildren="false"
         android:clipToPadding="false">
@@ -40,9 +40,9 @@
         <com.phlox.tvwebbrowser.activity.main.view.tabs.TabsView
             android:id="@+id/vTabs"
             android:layout_width="match_parent"
-            android:layout_height="60dp"
+            android:layout_height="44dp"
             android:layout_below="@+id/vActionBar"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="0dp"
             android:focusable="true"
             android:nextFocusUp="@+id/ibMenu"
             android:nextFocusDown="@+id/ibCloseTab"

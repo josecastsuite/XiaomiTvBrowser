@@ -117,6 +117,10 @@ class TabsAdapter(private val tabsView: TabsView) : RecyclerView.Adapter<TabView
                 tabsView.showTabOptions(tabState)
                 true
             }
+
+            vb.tabClose.setOnClickListener {
+                listener?.closeTab(tabState)
+            }
         }
     }
 }

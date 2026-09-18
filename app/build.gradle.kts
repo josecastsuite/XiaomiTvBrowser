@@ -117,6 +117,11 @@ dependencies {
     implementation(libs.ad.block)
     implementation(libs.pinned.section.listview)
 
+    implementation("androidx.media3:media3-exoplayer:1.2.1")
+    implementation("androidx.media3:media3-ui:1.2.1")
+    implementation("androidx.media3:media3-exoplayer-hls:1.2.1")
+    implementation("androidx.media3:media3-exoplayer-dash:1.2.1")
+
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
 }

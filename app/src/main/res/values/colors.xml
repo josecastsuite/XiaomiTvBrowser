@@ -4,6 +4,8 @@
 
     <color name="top_bar_background">#eee</color>
     <color name="top_bar_background2">#fff</color>
+    <color name="chrome_tab_bar_bg">#DDE6F5</color>
+    <color name="chrome_omnibox_bg">#F1F3F4</color>
 
     <color name="day_night_text_color">#777</color>
     <color name="day_night_text_color_contrast">#000</color>

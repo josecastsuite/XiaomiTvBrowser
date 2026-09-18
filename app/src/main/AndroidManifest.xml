@@ -119,6 +119,14 @@
             android:windowSoftInputMode="adjustResize"
             tools:ignore="DiscouragedApi"/>
 
+        <activity
+            android:name=".activity.player.VideoPlayerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AppCompat.NoActionBar"
+            android:configChanges="orientation|screenSize|keyboard|keyboardHidden"
+            android:screenOrientation="sensorLandscape"
+            tools:ignore="DiscouragedApi" />
+
         <activity android:name=".activity.IncognitoModeMainActivity"
             android:process=":incognito"
             android:exported="false"

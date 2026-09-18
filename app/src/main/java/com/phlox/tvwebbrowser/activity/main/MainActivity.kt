@@ -318,6 +318,21 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
         startActivity(Intent(this@MainActivity, DownloadsActivity::class.java))
     }
 
+    override fun onTopNavigateBack() {
+        navigateBack()
+    }
+
+    override fun onTopNavigateForward() {
+        val tab = tabsModel.currentTab.value ?: return
+        if (tab.webEngine.canGoForward()) {
+            tab.webEngine.goForward()
+        }
+    }
+
+    override fun onTopRefresh() {
+        refresh()
+    }
+
     override fun showHistory() {
         startActivityForResult(
                 Intent(this@MainActivity, HistoryActivity::class.java),
@@ -594,6 +609,15 @@ open class MainActivity : AppCompatActivity(), ActionBar.Callback {
     private fun onDownloadRequested(url: String, referer: String, originalDownloadFileName: String, userAgent: String?, mimeType: String? = null,
                                     operationAfterDownload: Download.OperationAfterDownload = Download.OperationAfterDownload.NOP,
                                     base64BlobData: String? = null, stream: InputStream?, size: Long = 0L) {
+        val looksLikeDirectVideo = base64BlobData == null && (
+            mimeType?.startsWith("video/") == true ||
+            Regex("\\.(mp4|m3u8|mpd|mkv|webm)(\\?.*)?$", RegexOption.IGNORE_CASE).containsMatchIn(url)
+        )
+        if (looksLikeDirectVideo) {
+            startActivity(Intent(this, com.phlox.tvwebbrowser.activity.player.VideoPlayerActivity::class.java)
+                .putExtra(com.phlox.tvwebbrowser.activity.player.VideoPlayerActivity.EXTRA_VIDEO_URL, url))
+            return
+        }
         downloadIntent = Download(url, originalDownloadFileName, null, operationAfterDownload,
             mimeType, referer, userAgent, base64BlobData, stream, size)
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R &&

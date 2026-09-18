@@ -255,19 +255,17 @@ class WebViewWebEngine(val tab: WebTabState) : WebEngine, CursorDrawerDelegate.C
         }
 
         override fun onShowCustomView(view: View) {
+            //note: WebViewEx itself already added `view` to the Activity's decorView directly -
+            //adding it again to viewParent here would crash ("child already has a parent")
             callback?.onPrepareForFullscreen()
             webView?.visibility = View.GONE
-            viewParent?.apply {
-                addView(view)
-            }
             fullScreenView = view
         }
 
         override fun onHideCustomView() {
-            if (fullScreenView != null) {
-                viewParent?.removeView(fullScreenView)
-                fullScreenView = null
-            }
+            //note: WebViewEx itself already removed the view from the decorView -
+            //this is state cleanup only, no removeView call needed (or safe) here
+            fullScreenView = null
             webView?.visibility = View.VISIBLE
             callback?.onExitFullscreen()
         }

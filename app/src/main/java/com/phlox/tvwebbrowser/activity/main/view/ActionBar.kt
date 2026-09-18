@@ -7,20 +7,14 @@ import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View.OnFocusChangeListener
 import android.view.View.OnKeyListener
-import android.view.animation.Animation
-import android.view.animation.AnimationUtils
 import android.view.inputmethod.InputMethodManager
 import android.widget.ImageButton
 import android.widget.LinearLayout
-import androidx.appcompat.app.AppCompatActivity
-import com.phlox.tvwebbrowser.AppContext
 import com.phlox.tvwebbrowser.Config
 import com.phlox.tvwebbrowser.R
 import com.phlox.tvwebbrowser.TVBro
-import com.phlox.tvwebbrowser.activity.downloads.ActiveDownloadsModel
 import com.phlox.tvwebbrowser.databinding.ViewActionbarBinding
 import com.phlox.tvwebbrowser.utils.Utils
-import com.phlox.tvwebbrowser.utils.activemodel.ActiveModelsRepository
 
 class ActionBar @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null
@@ -28,8 +22,6 @@ class ActionBar @JvmOverloads constructor(
 
     private val vb = ViewActionbarBinding.inflate( LayoutInflater.from(context),this)
     var callback: Callback? = null
-    private var downloadAnimation: Animation? = null
-    private var downloadsModel = ActiveModelsRepository.get(ActiveDownloadsModel::class, context)
     private var extendedAddressBarMode = false
 
     interface Callback {
@@ -43,6 +35,9 @@ class ActionBar @JvmOverloads constructor(
         fun onExtendedAddressBarMode()
         fun onUrlInputDone()
         fun toggleIncognitoMode()
+        fun onTopNavigateBack()
+        fun onTopNavigateForward()
+        fun onTopRefresh()
     }
 
     private val etUrlFocusChangeListener = OnFocusChangeListener { _, focused ->
@@ -81,46 +76,57 @@ class ActionBar @JvmOverloads constructor(
 
     fun init() {
         orientation = HORIZONTAL
+        gravity = android.view.Gravity.CENTER_VERTICAL
 
         if (isInEditMode) return
 
-        val incognitoMode = AppContext.provideConfig().incognitoMode
-
-        vb.ibMenu.setOnClickListener { callback?.closeWindow() }
-        vb.ibDownloads.setOnClickListener { callback?.showDownloads() }
+        vb.ibTopBack.setOnClickListener { callback?.onTopNavigateBack() }
+        vb.ibTopForward.setOnClickListener { callback?.onTopNavigateForward() }
+        vb.ibTopRefresh.setOnClickListener { callback?.onTopRefresh() }
         vb.ibFavorites.setOnClickListener { callback?.showFavorites() }
-        vb.ibHistory.setOnClickListener { callback?.showHistory() }
-        vb.ibIncognito.setOnClickListener { callback?.toggleIncognitoMode() }
-        vb.ibSettings.setOnClickListener { callback?.showSettings() }
-
-        if (Utils.isFireTV(context)) {
-            vb.ibMenu.nextFocusRightId = R.id.ibHistory
-            removeView(vb.ibVoiceSearch)
-        } else {
-            vb.ibVoiceSearch.setOnClickListener { callback?.initiateVoiceSearch() }
-        }
-
-        vb.ibIncognito.isChecked = incognitoMode
+        vb.ibOverflowMenu.setOnClickListener { showOverflowMenu(it) }
 
         vb.etUrl.onFocusChangeListener = etUrlFocusChangeListener
 
         vb.etUrl.setOnKeyListener(etUrlKeyListener)
+    }
 
-
-        downloadsModel.activeDownloads.subscribe(context as AppCompatActivity) {
-            if (it.isNotEmpty()) {
-                if (downloadAnimation == null) {
-                    downloadAnimation = AnimationUtils.loadAnimation(context, R.anim.infinite_fadeinout_anim)
-                    vb.ibDownloads.startAnimation(downloadAnimation)
-                }
-            } else {
-                downloadAnimation?.apply {
-                    this.reset()
-                    vb.ibDownloads.clearAnimation()
-                    downloadAnimation = null
-                }
-            }
+    private fun showOverflowMenu(anchor: android.view.View) {
+        val popup = androidx.appcompat.widget.PopupMenu(context, anchor)
+        val menu = popup.menu
+        if (!Utils.isFireTV(context)) {
+            menu.add(0, MENU_VOICE_SEARCH, 0, R.string.voice_search)
         }
+        menu.add(0, MENU_HISTORY, 0, R.string.history)
+        menu.add(0, MENU_DOWNLOADS, 0, R.string.downloads)
+        menu.add(0, MENU_INCOGNITO, 0, R.string.incognito_mode)
+        menu.add(0, MENU_ABOUT, 0, R.string.version_and_updates)
+        menu.add(0, MENU_CLOSE, 0, R.string.close_application)
+        popup.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                MENU_VOICE_SEARCH -> callback?.initiateVoiceSearch()
+                MENU_HISTORY -> callback?.showHistory()
+                MENU_DOWNLOADS -> callback?.showDownloads()
+                MENU_INCOGNITO -> callback?.toggleIncognitoMode()
+                MENU_ABOUT -> showAboutDialog()
+                MENU_CLOSE -> callback?.closeWindow()
+            }
+            true
+        }
+        popup.show()
+    }
+
+    private fun showAboutDialog() {
+        val message = android.text.Html.fromHtml(
+            context.getString(R.string.web_browser_optimized_for_tvs) +
+                "<br><br><u>https://github.com/truefedex/tv-bro</u>",
+            android.text.Html.FROM_HTML_MODE_LEGACY
+        )
+        androidx.appcompat.app.AlertDialog.Builder(context)
+            .setTitle(R.string.app_name_short)
+            .setMessage(message)
+            .setPositiveButton(R.string.ok, null)
+            .show()
     }
 
     fun setAddressBoxText(text: String) {
@@ -160,6 +166,15 @@ class ActionBar @JvmOverloads constructor(
     }
 
     fun catchFocus() {
-        vb.ibMenu.requestFocus()
+        vb.ibTopBack.requestFocus()
+    }
+
+    companion object {
+        private const val MENU_VOICE_SEARCH = 1
+        private const val MENU_HISTORY = 2
+        private const val MENU_DOWNLOADS = 3
+        private const val MENU_INCOGNITO = 4
+        private const val MENU_ABOUT = 6
+        private const val MENU_CLOSE = 5
     }
 }

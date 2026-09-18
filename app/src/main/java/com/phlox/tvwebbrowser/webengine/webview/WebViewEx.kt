@@ -71,7 +71,8 @@ open class WebViewEx(context: Context, val callback: Callback, val jsInterface: 
     private var virtualCursorMode: Boolean = true
     private var genericInjects: String? = null
     private var webChromeClient_: WebChromeClient
-    private var fullscreenViewCallback: WebChromeClient.CustomViewCallback? = null
+    private var customView: View? = null
+    private var customViewCallback: WebChromeClient.CustomViewCallback? = null
     private var pickFileCallback: ValueCallback<Array<Uri>>? = null
     private var permRequestDialog: AlertDialog? = null
     private var webPermissionsRequest: PermissionRequest? = null
@@ -132,6 +133,7 @@ open class WebViewEx(context: Context, val callback: Callback, val jsInterface: 
             allowContentAccess = false
             cacheMode = WebSettings.LOAD_DEFAULT
             mediaPlaybackRequiresUserGesture = !config.allowAutoplayMedia
+            mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
             setGeolocationEnabled(true)
             javaScriptCanOpenWindowsAutomatically = false
             setSupportMultipleWindows(true)
@@ -163,6 +165,8 @@ open class WebViewEx(context: Context, val callback: Callback, val jsInterface: 
             }
         }
 
+        setLayerType(View.LAYER_TYPE_HARDWARE, null)
+
         setOnLongClickListener { v ->
             true
         }
@@ -193,13 +197,36 @@ open class WebViewEx(context: Context, val callback: Callback, val jsInterface: 
             }
 
             override fun onShowCustomView(view: View, callback: CustomViewCallback) {
+                if (customView != null) {
+                    callback.onCustomViewHidden()
+                    return
+                }
+                customView = view
+                customViewCallback = callback
+                val activity = this@WebViewEx.callback.getActivity() ?: return
+                (activity.window.decorView as android.widget.FrameLayout).addView(
+                    customView, android.widget.FrameLayout.LayoutParams(-1, -1))
+                @Suppress("DEPRECATION")
+                activity.window.decorView.systemUiVisibility =
+                    View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                 this@WebViewEx.callback.onShowCustomView(view)
-                fullscreenViewCallback = callback
             }
 
             override fun onHideCustomView() {
+                val activity = this@WebViewEx.callback.getActivity()
+                if (activity != null && customView != null) {
+                    (activity.window.decorView as android.widget.FrameLayout).removeView(customView)
+                    @Suppress("DEPRECATION")
+                    activity.window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
+                }
+                customView = null
                 callback.onHideCustomView()
-                fullscreenViewCallback?.onCustomViewHidden()
+                customViewCallback?.onCustomViewHidden()
+                customViewCallback = null
+            }
+
+            override fun getDefaultVideoPoster(): Bitmap? {
+                return createBitmap(10, 10)
             }
 
             override fun onProgressChanged(view: WebView, newProgress: Int) {
